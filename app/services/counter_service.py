@@ -35,8 +35,10 @@ class CounterService(IService):
 
     async def start(self):
 
-        if self._task:
+        if self._task is not None:
             return
+
+        self._status = ServiceStatus.STARTING
 
         self._task = asyncio.create_task(
             self._run()
