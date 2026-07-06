@@ -1,0 +1,11 @@
+class HealthStatus:
+
+    HEALTHY
+
+    LASTCHECK
+
+    LASTFAILURE
+
+    RECOVERYATTEMPTS
+
+    MESSAGE
