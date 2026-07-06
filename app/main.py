@@ -1,7 +1,7 @@
 import asyncio
 
-from app.core import host
-from app.logger.logger import Logger
+from core import host
+from logger.logger import Logger
 
 
 async def main():

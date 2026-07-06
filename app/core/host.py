@@ -1,11 +1,11 @@
 import asyncio
 from logging import Logger as PythonLogger
 
-from app.core.registry import ServiceRegistry
-from app.core.service_manager import ServiceManager
+from core.registry import ServiceRegistry
+from core.service_manager import ServiceManager
 
-from app.services.heartbeat_service import HeartbeatService
-from app.services.counter_service import CounterService
+from services.heartbeat_service import HeartbeatService
+from services.counter_service import CounterService
 
 
 class Host:

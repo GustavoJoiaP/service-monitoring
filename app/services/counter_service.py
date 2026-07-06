@@ -5,8 +5,8 @@ from asyncio import Task
 from logging import Logger as PythonLogger
 from typing import Optional
 
-from app.models.service_status import ServiceStatus
-from app.services.interfaces.iservice import IService
+from models.service_status import ServiceStatus
+from services.interfaces.iservice import IService
 
 
 class CounterService(IService):

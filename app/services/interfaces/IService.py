@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from app.models.health_status import HealthStatus
-from app.models.service_status import ServiceStatus
+from models.health_status import HealthStatus
+from models.service_status import ServiceStatus
 
 
 class IService(ABC):

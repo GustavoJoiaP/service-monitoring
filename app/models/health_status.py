@@ -1,11 +1,18 @@
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
+
+@dataclass
 class HealthStatus:
 
-    HEALTHY
 
-    LASTCHECK
+    healthy: bool
 
-    LASTFAILURE
+    last_check: datetime
 
-    RECOVERYATTEMPTS
+    last_failure: Optional[datetime] = None
 
-    MESSAGE
+    message: str = ""
+
+    recovery_attempts: int = 0
