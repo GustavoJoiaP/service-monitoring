@@ -6,15 +6,17 @@ from typing import Optional
 
 from app.models.service_status import ServiceStatus
 from app.services.interfaces.iservice import IService
-
+from logging import Logger as PythonLogger
 
 class HeartbeatService(IService):
 
-    def __init__(self) -> None:
+    def __init__(self, logger: PythonLogger):
+
+        self._logger = logger
 
         self._status = ServiceStatus.STOPPED
 
-        self._task: Optional[Task] = None
+        self._task = None
 
     @property
     def name(self) -> str:
