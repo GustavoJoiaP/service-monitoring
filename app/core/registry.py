@@ -1,13 +1,14 @@
 from typing import Dict, List
 
-from app.services.interfaces import IService
+from app.services.interfaces.IService import IService
+
 
 
 class ServiceRegistry:
 
 
     def __init__(self) -> None:
-        self._services: Dict[str, IService] = {} # type: ignore
+        self._services: Dict[str, IService] = {} 
 
     @property
     def count(self) -> int:
@@ -44,7 +45,7 @@ class ServiceRegistry:
 
         return self._services[service_name]
 
-    def get_all(self) -> List[IService]: # type: ignore
+    def get_all(self) -> List[IService]: 
 
 
         return list(self._services.values())
