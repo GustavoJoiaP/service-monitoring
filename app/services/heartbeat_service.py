@@ -4,8 +4,8 @@ import asyncio
 from asyncio import Task
 from typing import Optional
 
-from models.service_status import ServiceStatus
-from services.interfaces.iservice import IService
+from app.models.service_status import ServiceStatus
+from app.services.interfaces.iservice import IService
 from logging import Logger as PythonLogger
 
 class HeartbeatService(IService):

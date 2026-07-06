@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import List
 
-from core.registry import ServiceRegistry
-from services.interfaces.iservice import IService
+from app.core.registry import ServiceRegistry
+from app.services.interfaces.iservice import IService
 
 
 class ServiceManager:
