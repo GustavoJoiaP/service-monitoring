@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from app.services.interfaces.IService import IService
+from app.services.interfaces.iservice import IService
 
 
 

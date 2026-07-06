@@ -4,7 +4,7 @@ import asyncio
 from typing import List
 
 from app.core.registry import ServiceRegistry
-from app.services.interfaces.IService import IService
+from app.services.interfaces.iservice import IService
 
 
 class ServiceManager:
