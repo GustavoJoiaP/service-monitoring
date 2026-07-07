@@ -5,6 +5,7 @@ from app.core.recovery_manager import RecoveryManager
 from app.core.registry import ServiceRegistry
 from app.core.service_manager import ServiceManager
 
+from app.services.faulty_service import FaultyService
 from app.services.heartbeat_service import HeartbeatService
 from app.services.counter_service import CounterService
 from app.core.health_monitor import HealthMonitor
@@ -34,10 +35,12 @@ class Host:
         heartbeat = HeartbeatService(self._logger)
 
         counter = CounterService(self._logger)
+        faulty = FaultyService(self._logger)
 
         self._registry.register(heartbeat)
 
         self._registry.register(counter)
+        self._registry.register(faulty)
 
         self._logger.info(
             f"{self._registry.count} services registered."
