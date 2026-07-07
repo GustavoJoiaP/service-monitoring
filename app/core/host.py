@@ -1,8 +1,10 @@
 import asyncio
 from logging import Logger as PythonLogger
 
+from app.core.configuration import Configuration
 from app.core.recovery_manager import RecoveryManager
 from app.core.registry import ServiceRegistry
+from app.core.service_factory import ServiceFactory
 from app.core.service_manager import ServiceManager
 
 from app.services.faulty_service import FaultyService
@@ -32,18 +34,19 @@ class Host:
     async def initialize(self):
 
         self._logger.info("Initializing Host...")
+        configuration = Configuration("config/services.json")
 
-        heartbeat = HeartbeatService(self._logger)
+        for service in configuration.services:
 
-        counter = CounterService(self._logger)
-        faulty = FaultyService(self._logger)
-        worker = WorkerProcessService(self._logger)
+            if not service["enabled"]:
+                continue
 
-        self._registry.register(heartbeat)
+            instance = ServiceFactory.create(
+                service["type"],
+                self._logger
+            )
 
-        self._registry.register(counter)
-        self._registry.register(faulty)
-        self._registry.register(worker)
+            self._registry.register(instance)
 
         self._logger.info(
             f"{self._registry.count} services registered."

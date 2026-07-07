@@ -1,0 +1,24 @@
+{
+  "services": [
+    {
+      "type": "heartbeat",
+      "enabled": true
+    },
+    {
+      "type": "counter",
+      "enabled": true
+    },
+    {
+      "type": "faulty",
+      "enabled": true
+    },
+    {
+      "type": "worker",
+      "enabled": true
+    },
+    {
+    "type":"worker",
+    "enabled":true
+    }   
+  ]
+}
