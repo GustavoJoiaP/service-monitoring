@@ -15,10 +15,6 @@
     {
       "type": "worker",
       "enabled": true
-    },
-    {
-    "type":"worker",
-    "enabled":true
-    }   
+    }  
   ]
 }
