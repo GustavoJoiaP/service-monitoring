@@ -10,8 +10,17 @@ async def main():
 
     host = Host(logger)
 
-    await host.run()
+    try:
+
+        await host.run()
+
+    except KeyboardInterrupt:
+
+        logger.info("KeyboardInterrupt received.")
+
+        await host.stop()
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())

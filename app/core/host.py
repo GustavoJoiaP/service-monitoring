@@ -54,3 +54,11 @@ class Host:
         while True:
 
             await asyncio.sleep(1)
+    
+    async def stop(self):
+
+        self._logger.info("Stopping Host...")
+    
+        await self._manager.stop_all()
+    
+        self._logger.info("Host stopped.")
