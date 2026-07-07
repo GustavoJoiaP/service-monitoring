@@ -9,6 +9,7 @@ from app.services.faulty_service import FaultyService
 from app.services.heartbeat_service import HeartbeatService
 from app.services.counter_service import CounterService
 from app.core.health_monitor import HealthMonitor
+from app.services.worker_process_service import WorkerProcessService
 
 
 class Host:
@@ -36,11 +37,13 @@ class Host:
 
         counter = CounterService(self._logger)
         faulty = FaultyService(self._logger)
+        worker = WorkerProcessService(self._logger)
 
         self._registry.register(heartbeat)
 
         self._registry.register(counter)
         self._registry.register(faulty)
+        self._registry.register(worker)
 
         self._logger.info(
             f"{self._registry.count} services registered."

@@ -21,6 +21,9 @@ class ServiceManager:
     async def start(self, service_name: str) -> None:
 
         service = self._registry.get(service_name)
+        self._logger.info(
+            f"Starting service [{service.name}]"
+        )
 
         await service.start()
 
