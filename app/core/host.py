@@ -34,16 +34,24 @@ class Host:
     async def initialize(self):
 
         self._logger.info("Initializing Host...")
-        configuration = Configuration("../config/services.json")
+        configuration = Configuration("app/config/services.json")
 
         for service in configuration.services:
 
             if not service["enabled"]:
                 continue
+            
+            self._logger.info(
+                f"Creating service type: {service['type']}"
+            )
 
             instance = ServiceFactory.create(
                 service["type"],
                 self._logger
+            )
+            
+            self._logger.info(
+                f"Instance name: {instance.name}"
             )
 
             self._registry.register(instance)
