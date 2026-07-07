@@ -34,7 +34,7 @@ class Host:
     async def initialize(self):
 
         self._logger.info("Initializing Host...")
-        configuration = Configuration("config/services.json")
+        configuration = Configuration("../config/services.json")
 
         for service in configuration.services:
 
