@@ -6,6 +6,7 @@ from app.core.service_manager import ServiceManager
 
 from app.services.heartbeat_service import HeartbeatService
 from app.services.counter_service import CounterService
+from app.core.health_monitor import HealthMonitor
 
 
 class Host:
@@ -17,6 +18,7 @@ class Host:
         self._registry = ServiceRegistry()
 
         self._manager = ServiceManager(self._registry)
+        self._health_monitor = HealthMonitor(self._registry, self._logger)
 
     async def initialize(self):
 
@@ -39,6 +41,7 @@ class Host:
         self._logger.info("Starting services...")
 
         await self._manager.start_all()
+        await self._health_monitor.start()
 
         self._logger.info("All services started.")
 
@@ -58,7 +61,9 @@ class Host:
     async def stop(self):
 
         self._logger.info("Stopping Host...")
-    
+        
+        await self._health_monitor.stop()
+
         await self._manager.stop_all()
-    
+
         self._logger.info("Host stopped.")
