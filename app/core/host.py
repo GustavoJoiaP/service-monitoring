@@ -1,6 +1,7 @@
 import asyncio
 from logging import Logger as PythonLogger
 
+from app.core.recovery_manager import RecoveryManager
 from app.core.registry import ServiceRegistry
 from app.core.service_manager import ServiceManager
 
@@ -19,6 +20,13 @@ class Host:
 
         self._manager = ServiceManager(self._registry)
         self._health_monitor = HealthMonitor(self._registry, self._logger)
+        self._recovery_manager = RecoveryManager(self._logger)
+
+        self._health_monitor = HealthMonitor(
+            registry=self._registry,
+            logger=self._logger,
+            recovery_manager=self._recovery_manager
+        )
 
     async def initialize(self):
 
@@ -61,7 +69,6 @@ class Host:
     async def stop(self):
 
         self._logger.info("Stopping Host...")
-        
         await self._health_monitor.stop()
 
         await self._manager.stop_all()

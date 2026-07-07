@@ -1,7 +1,10 @@
 import asyncio
+from asyncio import Task
 from logging import Logger as PythonLogger
+from typing import Optional
 
 from app.core.registry import ServiceRegistry
+from app.core.recovery_manager import RecoveryManager
 
 
 class HealthMonitor:
@@ -10,15 +13,17 @@ class HealthMonitor:
         self,
         registry: ServiceRegistry,
         logger: PythonLogger,
+        recovery_manager: RecoveryManager,
         interval: int = 5,
     ):
 
         self._registry = registry
         self._logger = logger
+        self._recovery_manager = recovery_manager
         self._interval = interval
 
         self._running = False
-        self._task = None
+        self._task: Optional[Task] = None
 
     async def start(self):
 
@@ -65,5 +70,6 @@ class HealthMonitor:
                     self._logger.warning(
                         f"[HEALTH] {service.name} -> FAILED"
                     )
+                    await self._recovery_manager.recover(service)
 
             await asyncio.sleep(self._interval)
