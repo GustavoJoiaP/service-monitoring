@@ -17,7 +17,7 @@
             "name": "Producer",
             "command": [
                 "python3",
-                "workers/producer_worker.py"
+                "app/workers/producer_worker.py"
             ]
         },
 
@@ -27,7 +27,7 @@
             "name": "Consumer",
             "command": [
                 "python3",
-                "workers/consumer_worker.py"
+                "app/workers/consumer_worker.py"
             ]
         }
     ]
