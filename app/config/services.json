@@ -1,20 +1,34 @@
 {
-  "services": [
-    {
-      "type": "heartbeat",
-      "enabled": true
-    },
-    {
-      "type": "counter",
-      "enabled": true
-    },
-    {
-      "type": "faulty",
-      "enabled": true
-    },
-    {
-      "type": "worker",
-      "enabled": true
-    }  
-  ]
+    "services": [
+
+        {
+            "type": "heartbeat",
+            "enabled": true
+        },
+
+        {
+            "type": "counter",
+            "enabled": true
+        },
+
+        {
+            "type": "worker",
+            "enabled": true,
+            "name": "Producer",
+            "command": [
+                "python3",
+                "workers/producer_worker.py"
+            ]
+        },
+
+        {
+            "type": "worker",
+            "enabled": true,
+            "name": "Consumer",
+            "command": [
+                "python3",
+                "workers/consumer_worker.py"
+            ]
+        }
+    ]
 }

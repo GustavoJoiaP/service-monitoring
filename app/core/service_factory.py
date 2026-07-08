@@ -9,7 +9,9 @@ from app.services.worker_process_service import WorkerProcessService
 class ServiceFactory:
 
     @staticmethod
-    def create(service_type: str, logger: Logger):
+    def create(service, logger: Logger):
+
+        service_type = service["type"]
 
         if service_type == "heartbeat":
             return HeartbeatService(logger)
@@ -21,6 +23,13 @@ class ServiceFactory:
             return FaultyService(logger)
 
         if service_type == "worker":
-            return WorkerProcessService(logger)
 
-        raise Exception(f"Unknown service: {service_type}")
+            return WorkerProcessService(
+                logger=logger,
+                service_name=service["name"],
+                command=service["command"]
+            )
+
+        raise Exception(
+            f"Unknown service: {service_type}"
+        )

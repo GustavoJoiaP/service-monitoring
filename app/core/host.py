@@ -46,7 +46,7 @@ class Host:
             )
 
             instance = ServiceFactory.create(
-                service["type"],
+                service,
                 self._logger
             )
             

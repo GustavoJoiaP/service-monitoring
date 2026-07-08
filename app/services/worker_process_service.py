@@ -1,93 +1,81 @@
 import asyncio
-from asyncio.subprocess import Process
-from datetime import datetime
-from logging import Logger as PythonLogger
-from typing import Optional
+from logging import Logger
 
 from app.core.process_inspector import ProcessInspector
 from app.core.process_manager import ProcessManager
-from app.models.health_report import HealthReport
-from app.models.service_status import ServiceStatus
+
+from app.models.health_status import HealthStatus
 from app.services.interfaces.iservice import IService
 
 
 class WorkerProcessService(IService):
 
-    def __init__(self, logger: PythonLogger):
+    def __init__(
+        self,
+        logger: Logger,
+        service_name: str,
+        command: list[str]
+    ):
 
         self._logger = logger
 
+        self._service_name = service_name
+
+        self._command = command
+
         self._manager = ProcessManager()
 
-        self._process: Optional[Process] = None
-
-        self._status = ServiceStatus.REGISTERED
-        
         self._inspector = ProcessInspector()
+
+        self._process = None
 
     @property
     def name(self):
 
-        return "WorkerProcess"
+        return self._service_name
 
     @property
-    def status(self):
+    def health(self):
 
-        return self._status
+        if self._process is None:
+            return HealthStatus.UNHEALTHY
 
-    @property
-    def task(self):
-
-        return None
+        return HealthStatus.HEALTHY
 
     async def start(self):
 
         self._logger.info(
-            "Starting WorkerProcess..."
+            f"Starting {self.name}"
         )
 
         self._process = await self._manager.start(
-            [
-                "python3",
-                "app/workers/worker.py",
-            ]
+            self._command
         )
-
-        self._status = ServiceStatus.RUNNING
 
     async def stop(self):
 
-        if self._process:
+        if self._process is None:
+            return
 
-            await self._manager.stop(
-                self._process
-            )
-
-        self._status = ServiceStatus.STOPPED
-
-    async def restart(self):
-
-        self._logger.warning(
-            "Restarting WorkerProcess..."
+        await self._manager.stop(
+            self._process
         )
 
-        await self.stop()
+    async def execute(self):
 
-        await self.start()
+        pass
 
-    async def is_alive(self) -> HealthReport:
+    async def is_alive(self):
 
         if self._process is None:
-            return HealthReport(
-                service_name=self.name,
-                healthy=info.exists,
-                checked_at=datetime.now(),
-                process=info,
-                message="OK" if info.exists else "Process not found."
-            )
+            return False
 
-        info = await self._inspector.inspect(
+        info = await self._inspector.get_process_info(
             self._process.pid
         )
 
         return info.exists
+
+    async def check_health(self):
+
+        return await self.is_alive()
