@@ -1,10 +1,12 @@
 import asyncio
+from asyncio import Task
 from logging import Logger
+from typing import Optional
 
 from app.core.process_inspector import ProcessInspector
 from app.core.process_manager import ProcessManager
 
-from app.models.health_status import HealthStatus
+from app.models.service_status import ServiceStatus
 from app.services.interfaces.iservice import IService
 
 
@@ -18,54 +20,72 @@ class WorkerProcessService(IService):
     ):
 
         self._logger = logger
-
         self._service_name = service_name
-
         self._command = command
 
         self._manager = ProcessManager()
-
         self._inspector = ProcessInspector()
 
         self._process = None
+        self._task: Optional[Task] = None
+
+        self._status = ServiceStatus.STOPPED
 
     @property
-    def name(self):
-
+    def name(self) -> str:
         return self._service_name
 
     @property
-    def health(self):
+    def status(self) -> ServiceStatus:
+        return self._status
 
-        if self._process is None:
-            return HealthStatus.UNHEALTHY
+    @property
+    def task(self) -> Optional[Task]:
+        return self._task
 
-        return HealthStatus.HEALTHY
+    async def start(self) -> None:
 
-    async def start(self):
+        if self._status == ServiceStatus.RUNNING:
+            return
 
         self._logger.info(
-            f"Starting {self.name}"
+            f"Starting worker {self.name}"
         )
 
         self._process = await self._manager.start(
             self._command
         )
 
-    async def stop(self):
+        self._status = ServiceStatus.RUNNING
+
+    async def stop(self) -> None:
 
         if self._process is None:
             return
+
+        self._logger.info(
+            f"Stopping worker {self.name}"
+        )
 
         await self._manager.stop(
             self._process
         )
 
-    async def execute(self):
+        self._status = ServiceStatus.STOPPED
 
-        pass
+    async def restart(self) -> None:
 
-    async def is_alive(self):
+        self._logger.warning(
+            f"Restarting worker {self.name}"
+        )
+
+        await self.stop()
+
+        await asyncio.sleep(1)
+
+        await self.start()
+
+    async def is_alive(self) -> bool:
 
         if self._process is None:
             return False
@@ -75,7 +95,3 @@ class WorkerProcessService(IService):
         )
 
         return info.exists
-
-    async def check_health(self):
-
-        return await self.is_alive()
