@@ -87,11 +87,18 @@ class WorkerProcessService(IService):
 
     async def is_alive(self) -> bool:
 
+        self._logger.info(f"Checking {self.name}")
+
         if self._process is None:
+            self._logger.warning(f"{self.name}: process is None")
             return False
 
         info = await self._inspector.get_process_info(
             self._process.pid
+        )
+
+        self._logger.info(
+            f"{self.name}: pid={self._process.pid} exists={info.exists}"
         )
 
         return info.exists
