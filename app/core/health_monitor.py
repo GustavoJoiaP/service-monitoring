@@ -57,19 +57,28 @@ class HealthMonitor:
 
             for service in self._registry.get_all():
 
-                alive = await service.is_alive()
+                try:
 
-                if alive:
+                    alive = await service.is_alive()
 
-                    self._logger.info(
-                        f"[HEALTH] {service.name} -> HEALTHY"
+                    if alive:
+
+                        self._logger.info(
+                            f"[HEALTH] {service.name} -> HEALTHY"
+                        )
+
+                    else:
+
+                        self._logger.warning(
+                            f"[HEALTH] {service.name} -> FAILED"
+                        )
+
+                        await self._recovery_manager.recover(service)
+
+                except Exception as ex:
+
+                    self._logger.exception(
+                        f"Health check failed for {service.name}: {ex}"
                     )
-
-                else:
-
-                    self._logger.warning(
-                        f"[HEALTH] {service.name} -> FAILED"
-                    )
-                    await self._recovery_manager.recover(service)
 
             await asyncio.sleep(self._interval)

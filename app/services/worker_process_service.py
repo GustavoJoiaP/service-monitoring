@@ -93,12 +93,10 @@ class WorkerProcessService(IService):
             self._logger.warning(f"{self.name}: process is None")
             return False
 
-        info = await self._inspector.get_process_info(
-            self._process.pid
-        )
+        info = await self._inspector.get_process_info(self._process.pid)
 
         self._logger.info(
-            f"{self.name}: pid={self._process.pid} exists={info.exists}"
+            f"{self.name}: PID={info.pid} exists={info.exists}"
         )
 
         return info.exists

@@ -5,7 +5,7 @@ from app.models.process_info import ProcessInfo
 
 class ProcessInspector:
 
-    async def inspect(self, pid: int) -> ProcessInfo:
+    async def get_process_info(self, pid: int) -> ProcessInfo:
 
         process = await asyncio.create_subprocess_exec(
             "ps",
