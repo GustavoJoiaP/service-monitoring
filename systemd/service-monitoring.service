@@ -1,0 +1,21 @@
+[Unit]
+Description=Service Monitoring Host
+After=network.target
+
+[Service]
+
+Type=simple
+
+WorkingDirectory=/opt/service-monitoring
+
+ExecStart=/opt/service-monitoring/.venv/bin/python -m app.main
+
+Restart=always
+
+RestartSec=5
+
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+
+WantedBy=multi-user.target
