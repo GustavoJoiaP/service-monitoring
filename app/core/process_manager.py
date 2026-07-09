@@ -12,11 +12,15 @@ class ProcessManager:
 
     async def stop(self, process: Process):
 
-        if process.returncode is None:
+        if process is None:
+            return
 
-            process.terminate()
+        if process.returncode is not None:
+            return
 
-            await process.wait()
+        process.terminate()
+
+        await process.wait()
 
     async def is_alive(self, process: Process) -> bool:
 

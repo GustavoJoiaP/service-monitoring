@@ -29,6 +29,15 @@
                 "python3",
                 "app/workers/consumer_worker.py"
             ]
+        },
+        {
+            "type": "worker",
+            "name": "PortsCheck",
+            "enabled": true,
+            "command": [
+                "python3",
+                "scripts/ports_check.py"
+            ]
         }
     ]
 }

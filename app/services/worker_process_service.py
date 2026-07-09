@@ -82,6 +82,7 @@ class WorkerProcessService(IService):
         await self.stop()
 
         await asyncio.sleep(1)
+        self._process = None
 
         await self.start()
 
