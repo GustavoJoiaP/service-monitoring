@@ -1,0 +1,12 @@
+services:
+
+  nginx:
+
+    image: docker.io/library/nginx:latest
+
+    container_name: poc-nginx
+
+    ports:
+      - "8080:80"
+
+    restart: unless-stopped

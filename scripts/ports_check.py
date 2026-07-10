@@ -10,7 +10,11 @@ import time
 
 from copy import deepcopy
 
-COMPOSE_FILE = "podman-compose.yaml"
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+COMPOSE_FILE = PROJECT_ROOT / "podman" / "podman-compose.yaml"
 
 def __init__():
     
