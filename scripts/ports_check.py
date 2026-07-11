@@ -147,44 +147,38 @@ def process_port_mapping(original_mapping):
     return f"{new_port}:{container_port}{protocol}"
 
 
-def find_podman_compose():
+def find_compose():
 
-    exec_path = shutil.which("podman-compose")
-
-    if exec_path:
-        return exec_path
-
-    possiveis_caminhos = [
-        "/usr/local/bin/podman-compose",
-        "/usr/bin/podman-compose"
-    ]
-
-    sudo_user = os.environ.get("SUDO_USER")
-
-    if sudo_user:
+    # Docker Compose v2
+    if shutil.which("docker"):
 
         try:
 
-            user_home = pwd.getpwnam(
-                sudo_user
-            ).pw_dir
-
-            possiveis_caminhos.append(
-                f"{user_home}/.local/bin/podman-compose"
+            subprocess.run(
+                ["docker", "compose", "version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True
             )
 
-        except KeyError:
+            return ["docker", "compose"]
+
+        except Exception:
             pass
 
-    for caminho in possiveis_caminhos:
+    # Docker Compose v1
+    if shutil.which("docker-compose"):
 
-        if os.path.isfile(caminho) and os.access(
-            caminho,
-            os.X_OK
-        ):
-            return caminho
+        return ["docker-compose"]
 
-    return "podman-compose"
+    # Podman Compose
+    if shutil.which("podman-compose"):
+
+        return ["podman-compose"]
+
+    raise RuntimeError(
+        "Docker Compose or Podman Compose not found."
+    )
 
 
 def execute_once():
@@ -240,28 +234,17 @@ def execute_once():
 
         logging.info("\nPort mappings updated.")
 
-    executable = find_podman_compose()
+    compose = find_compose()
 
-    cmd = [
-        executable,
+    cmd = compose + [
         "-f",
-        COMPOSE_FILE,
+        str(COMPOSE_FILE),
         "up",
         "-d",
         "--build",
         "--force-recreate",
     ]
 
-    sudo_user = os.environ.get("SUDO_USER")
-
-    if sudo_user:
-
-        cmd = [
-            "sudo",
-            "-H",
-            "-u",
-            sudo_user,
-        ] + cmd
 
     subprocess.run(
         cmd,
