@@ -52,9 +52,7 @@ if ! command -v docker >/dev/null 2>&1; then
 
     sudo apt update
 
-    sudo apt install -y \
-        docker.io \
-        docker-compose-plugin
+    sudo apt install -y docker.io docker-compose-v2
 
     sudo systemctl enable docker
 
