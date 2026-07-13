@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 PROJECT_NAME="service-monitoring"
 INSTALL_DIR="/opt/$PROJECT_NAME"
@@ -23,59 +23,87 @@ echo "$PROJECT_DIR"
 echo ""
 echo "Checking prerequisites..."
 
+sudo apt update
+
 if ! command -v python3 >/dev/null 2>&1; then
-
     echo "Installing Python..."
-
-    sudo apt update
 
     sudo apt install -y \
         python3 \
         python3-pip \
         python3-venv
-
 fi
 
 if ! command -v rsync >/dev/null 2>&1; then
-
     echo "Installing rsync..."
 
-    sudo apt update
-
     sudo apt install -y rsync
-
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
-
     echo "Installing Docker..."
 
-    sudo apt update
-
     sudo apt install -y docker.io docker-compose-v2
-
-    sudo systemctl enable docker
-
-    sudo systemctl start docker
-
 fi
+
+##################################################
+# Prepare Docker
+##################################################
 
 echo ""
-echo "Checking Docker service..."
+echo "Preparing Docker..."
 
-if ! sudo systemctl is-active --quiet docker; then
+# Kill manually started daemon (safe if not running)
+sudo pkill -f dockerd || true
 
-    sudo systemctl start docker
+# Remove stale PID
+sudo rm -f /var/run/docker.pid
 
-fi
+# Reset failed state
+sudo systemctl reset-failed docker || true
+
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable services
+sudo systemctl enable containerd
+sudo systemctl enable docker
+
+# Restart services
+sudo systemctl restart containerd
+sudo systemctl restart docker
+
+##################################################
+# Wait Docker
+##################################################
 
 echo ""
 echo "Waiting Docker become ready..."
 
+timeout=30
+
 until sudo docker info >/dev/null 2>&1
 do
     sleep 1
+    timeout=$((timeout-1))
+
+    if [ "$timeout" -le 0 ]; then
+        echo ""
+        echo "Docker failed to start."
+
+        echo ""
+        sudo systemctl status docker --no-pager
+
+        echo ""
+        sudo journalctl -u docker -n 100 --no-pager
+
+        exit 1
+    fi
 done
+
+##################################################
+# Validate Docker Compose
+##################################################
 
 if ! sudo docker compose version >/dev/null 2>&1; then
 
@@ -85,6 +113,15 @@ if ! sudo docker compose version >/dev/null 2>&1; then
     exit 1
 
 fi
+
+##################################################
+# Docker permissions
+##################################################
+
+echo ""
+echo "Adding current user to docker group..."
+
+sudo usermod -aG docker "$USER" || true
 
 ##################################################
 # Create installation folder
@@ -141,15 +178,6 @@ echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
 ##################################################
-# Docker Permissions
-##################################################
-
-echo ""
-echo "Adding current user to docker group..."
-
-sudo usermod -aG docker "$USER" || true
-
-##################################################
 # Install systemd service
 ##################################################
 
@@ -157,8 +185,8 @@ echo ""
 echo "Installing systemd service..."
 
 sudo cp \
-    systemd/$SERVICE_NAME \
-    /etc/systemd/system/
+    "systemd/$SERVICE_NAME" \
+    "/etc/systemd/system/"
 
 sudo systemctl daemon-reload
 
@@ -221,15 +249,19 @@ echo "Useful commands:"
 echo "-----------------------------------------"
 echo "View logs:"
 echo "sudo journalctl -u $PROJECT_NAME -f"
+
 echo ""
 echo "Restart service:"
 echo "sudo systemctl restart $PROJECT_NAME"
+
 echo ""
 echo "Stop service:"
 echo "sudo systemctl stop $PROJECT_NAME"
+
 echo ""
 echo "Docker containers:"
 echo "docker ps"
+
 echo ""
 echo "NOTE:"
 echo "If this is the first Docker installation,"
