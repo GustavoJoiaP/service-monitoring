@@ -4,7 +4,7 @@
         {
             "type": "worker",
             "name": "PortsCheck",
-            "enabled": true,
+            "enabled": false,
             "command": [
                 "python3",
                 "scripts/ports_check.py"

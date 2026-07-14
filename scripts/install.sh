@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 set -euo pipefail
 
@@ -176,6 +176,34 @@ echo ""
 echo "Installing Python dependencies..."
 
 pip install -r requirements.txt
+
+##################################################
+# Deploy containers
+##################################################
+
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}"
+
+if [ -f "$COMPOSE_FILE" ]; then
+
+    echo ""
+    echo "Deploying containers from $COMPOSE_FILE..."
+
+    python scripts/ports_check.py -f "$COMPOSE_FILE" --fix-cdi || {
+        echo ""
+        echo "WARNING: Container deploy failed."
+        echo "Run manually later:"
+        echo "  cd $INSTALL_DIR && python scripts/ports_check.py -f $COMPOSE_FILE"
+    }
+
+else
+
+    echo ""
+    echo "WARNING: Compose file '$COMPOSE_FILE' not found."
+    echo "Skipping container deployment."
+    echo "Run manually when ready:"
+    echo "  cd $INSTALL_DIR && python scripts/ports_check.py -f <compose-file>"
+
+fi
 
 ##################################################
 # Install systemd service
