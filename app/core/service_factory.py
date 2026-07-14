@@ -1,6 +1,7 @@
 from logging import Logger
 
 from app.services.counter_service import CounterService
+from app.services.docker_service import DockerService
 from app.services.faulty_service import FaultyService
 from app.services.heartbeat_service import HeartbeatService
 from app.services.worker_process_service import WorkerProcessService
@@ -23,11 +24,16 @@ class ServiceFactory:
             return FaultyService(logger)
 
         if service_type == "worker":
-
             return WorkerProcessService(
                 logger=logger,
                 service_name=service["name"],
                 command=service["command"]
+            )
+
+        if service_type == "docker":
+            return DockerService(
+                logger=logger,
+                config=service
             )
 
         raise Exception(

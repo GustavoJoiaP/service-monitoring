@@ -2,35 +2,6 @@
     "services": [
 
         {
-            "type": "heartbeat",
-            "enabled": true
-        },
-
-        {
-            "type": "counter",
-            "enabled": true
-        },
-
-        {
-            "type": "worker",
-            "enabled": true,
-            "name": "Producer",
-            "command": [
-                "python3",
-                "app/workers/producer_worker.py"
-            ]
-        },
-
-        {
-            "type": "worker",
-            "enabled": true,
-            "name": "Consumer",
-            "command": [
-                "python3",
-                "app/workers/consumer_worker.py"
-            ]
-        },
-        {
             "type": "worker",
             "name": "PortsCheck",
             "enabled": true,
@@ -38,6 +9,61 @@
                 "python3",
                 "scripts/ports_check.py"
             ]
+        },
+        {
+            "name": "redis",
+            "type": "docker",
+            "enabled": true,
+            "container_name": "monitor-redis",
+            "check": "tcp",
+            "host": "127.0.0.1",
+            "port": 6379
+        },
+        {
+            "name": "postgres",
+            "type": "docker",
+            "enabled": true,
+            "container_name": "monitor-postgres",
+            "check": "tcp",
+            "host": "127.0.0.1",
+            "port": 5432
+        },
+        {
+            "name": "nginx",
+            "type": "docker",
+            "enabled": true,
+            "container_name": "monitor-nginx",
+            "check": "http",
+            "url": "http://127.0.0.1:8080/",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "whoami",
+            "type": "docker",
+            "enabled": true,
+            "container_name": "monitor-whoami",
+            "check": "http",
+            "url": "http://127.0.0.1:8081/",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "mock-api",
+            "type": "docker",
+            "enabled": true,
+            "container_name": "monitor-mock-api",
+            "check": "http",
+            "url": "http://127.0.0.1:3000/health",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "idle-worker",
+            "type": "docker",
+            "enabled": true,
+            "container_name": "monitor-idle-worker",
+            "check": "container_state"
         }
     ]
 }

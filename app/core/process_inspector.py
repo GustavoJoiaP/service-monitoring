@@ -1,3 +1,4 @@
+import os
 import asyncio
 
 from app.models.process_info import ProcessInfo
@@ -7,17 +8,16 @@ class ProcessInspector:
 
     async def get_process_info(self, pid: int) -> ProcessInfo:
 
-        process = await asyncio.create_subprocess_exec(
-            "ps",
-            "-p",
-            str(pid),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        loop = asyncio.get_running_loop()
 
-        stdout, _ = await process.communicate()
+        def _check():
+            try:
+                os.kill(pid, 0)
+                return True
+            except OSError:
+                return False
 
-        exists = str(pid) in stdout.decode()
+        exists = await loop.run_in_executor(None, _check)
 
         return ProcessInfo(
             pid=pid,

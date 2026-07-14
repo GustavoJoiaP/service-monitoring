@@ -1,0 +1,53 @@
+services:
+
+  redis:
+    image: docker.io/redis:7-alpine
+    container_name: monitor-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  postgres:
+    image: docker.io/postgres:16-alpine
+    container_name: monitor-postgres
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d testdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  nginx:
+    image: docker.io/nginx:alpine
+    container_name: monitor-nginx
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  whoami:
+    image: docker.io/traefik/whoami:latest
+    container_name: monitor-whoami
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
+  mock-api:
+    build:
+      context: ./test-api
+      dockerfile: Dockerfile
+    container_name: monitor-mock-api
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  idle-worker:
+    image: docker.io/alpine:latest
+    container_name: monitor-idle-worker
+    command: ["sleep", "infinity"]
+    restart: unless-stopped

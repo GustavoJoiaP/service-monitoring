@@ -22,7 +22,7 @@ class Host:
 
         self._registry = ServiceRegistry()
 
-        self._manager = ServiceManager(self._registry)
+        self._manager = ServiceManager(self._registry, self._logger)
         self._recovery_manager = RecoveryManager(self._logger)
 
         self._health_monitor = HealthMonitor(

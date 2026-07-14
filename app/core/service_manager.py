@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from logging import Logger as PythonLogger
 from typing import List
 
 from app.core.registry import ServiceRegistry
@@ -10,8 +11,9 @@ from app.services.interfaces.iservice import IService
 class ServiceManager:
 
 
-    def __init__(self, registry: ServiceRegistry) -> None:
+    def __init__(self, registry: ServiceRegistry, logger: PythonLogger) -> None:
         self._registry = registry
+        self._logger = logger
 
     @property
     def services(self) -> List[IService]:
