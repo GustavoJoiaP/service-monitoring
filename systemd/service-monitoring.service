@@ -1,20 +1,24 @@
 ﻿[Unit]
 Description=Service Monitoring Host
-After=network.target
+After=network-online.target docker.service
+Requires=docker.service
 
 [Service]
-
 Type=simple
 
+User=root
+Group=root
+
 WorkingDirectory=/opt/service-monitoring
+
+Environment=PYTHONUNBUFFERED=1
+
+ExecStartPre=/bin/sh -c 'until docker info >/dev/null 2>&1; do sleep 1; done'
 
 ExecStart=/opt/service-monitoring/.venv/bin/python -m app.main
 
 Restart=always
-
 RestartSec=5
-
-Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
