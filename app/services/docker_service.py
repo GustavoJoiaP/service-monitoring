@@ -76,17 +76,22 @@ class DockerService(IService):
             stdout, stderr = await proc.communicate()
 
             if proc.returncode == 0:
-                self._logger.info(f"[{self.name}] Container restarted successfully.")
                 await asyncio.sleep(3)
 
                 if await self.is_alive():
+                    self._logger.info(f"[{self.name}] Container restarted and healthy.")
                     self._status = ServiceStatus.RUNNING
                     return
 
-            self._logger.warning(
-                f"[{self.name}] Restart attempt {attempt} failed: "
-                f"{stderr.decode().strip()}"
-            )
+                self._logger.warning(
+                    f"[{self.name}] Container started but service is unhealthy "
+                    f"(health check failed)"
+                )
+            else:
+                self._logger.warning(
+                    f"[{self.name}] docker restart failed (attempt {attempt}): "
+                    f"{stderr.decode().strip()}"
+                )
 
             await asyncio.sleep(2 ** attempt)
 

@@ -30,7 +30,7 @@ class Configuration:
 
         file_path = Path(compose_file)
         if not file_path.is_absolute():
-            file_path = self._config_path.parent / file_path
+            file_path = self._config_path.parent.parent.parent / file_path
 
         try:
             compose_bin = find_compose()
