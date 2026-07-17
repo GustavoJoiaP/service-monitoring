@@ -1,4 +1,7 @@
 {
+    "compose": {
+        "file": "docker-compose.yaml"
+    },
     "services": [
 
         {
