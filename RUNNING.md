@@ -1,6 +1,6 @@
 # Rodando o Service Monitoring Host
 
-Guia completo para executar a aplicação, capturar logs e gerar evidencias para o card.
+Guia completo para executar e gerenciar o Service Monitoring Host.
 
 ---
 
@@ -68,7 +68,7 @@ O que o install.sh faz:
 2. Prepara e inicia o Docker via systemd
 3. Copia o projeto para `/opt/service-monitoring`
 4. Cria virtualenv e instala PyYAML
-5. Deploy dos containers via `docker compose up -d`
+5. Deploy dos containers via `ports_check.py` (com resolucao de portas)
 6. Instala e inicia o systemd service `service-monitoring.service`
 
 ---
@@ -95,14 +95,27 @@ pip install -r requirements.txt
 Os containers sao os servicos que o Host vai monitorar. Precisam estar rodando antes de iniciar o monitoramento.
 
 ```bash
-# Subir todos os containers definidos no docker-compose.yaml
-docker compose up -d
+# Deploy com resolucao automatica de conflitos de porta
+python scripts/ports_check.py -f docker-compose.yaml -v
+```
 
-# Verificar se todos subiram
+O `ports_check.py` faz tres coisas:
+
+1. Detecta portas ocupadas e reatribui automaticamente
+2. Atualiza o `docker-compose.yaml` com as novas portas
+3. **Sincroniza o `app/config/services.json`** com as portas reais
+
+Isso e essencial — sem sincronizacao, o monitoramento tenta checar portas erradas e todos os health checks falham.
+
+> **Sem conflito de portas?** Se todas as portas originais estiverem livres, o script mantem as portas padrao e nao altera nada.
+
+### 3.3 Verificar containers
+
+```bash
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
-Saida esperada:
+Saida esperada (portas podem variar se houve reatribuicao):
 
 ```
 NAMES               STATUS          PORTS
@@ -114,14 +127,20 @@ monitor-mock-api    Up X minutes    0.0.0.0:3000->3000/tcp
 monitor-idle-worker Up X minutes
 ```
 
-### 3.3 Iniciar o Host
+Se as portas foram reatribuidas, verifique o `services.json` para confirmar a sincronizacao:
+
+```bash
+grep -E '"port"|"url"' app/config/services.json
+```
+
+### 3.4 Iniciar o Host
 
 ```bash
 # Com a virtualenv ativa
 python -m app.main
 ```
 
-### 3.4 O que observar nos logs
+### 3.5 O que observar nos logs
 
 A saida segue o formato:
 
@@ -146,7 +165,7 @@ A saida segue o formato:
 2026-07-20 10:00:06 | INFO     | [HEALTH] idle-worker -> HEALTHY
 ```
 
-### 3.5 Observar o ciclo de recuperacao
+### 3.6 Observar o ciclo de recuperacao
 
 Para testar a recuperacao, pare um container manualmente em outro terminal:
 
@@ -170,7 +189,7 @@ Se o container nao voltar apos 3 tentativas, o circuit breaker abre:
 2026-07-20 10:05:30 | CRITICAL | [redis] Circuit breaker OPEN — 3 consecutive failures. Manual intervention required.
 ```
 
-### 3.6 Parar a aplicacao
+### 3.7 Parar a aplicacao
 
 Pressione `Ctrl+C` no terminal onde o Host esta rodando:
 
@@ -220,3 +239,67 @@ sudo journalctl -u service-monitoring -b --no-pager
 ```
 
 ---
+
+## 5. Comandos Uteis
+
+### Gerenciamento de containers
+
+```bash
+# Listar containers do projeto
+docker ps --filter "name=monitor-"
+
+# Parar todos os containers do projeto
+docker stop $(docker ps --filter "name=monitor-" -q)
+
+# Remover todos os containers do projeto
+docker compose down
+
+# Verificar logs de um container
+docker logs monitor-redis
+docker logs monitor-nginx --tail 20
+```
+
+### Debug
+
+```bash
+# Verificar se as portas estao ocupadas
+python scripts/ports_check.py -f docker-compose.yaml -v
+
+# Sincronizar services.json manualmente
+python scripts/ports_check.py -f docker-compose.yaml -s app/config/services.json -v
+
+# Testar se o mock-api responde
+curl http://127.0.0.1:3000/health
+# Expects: {"status":"ok"}
+
+# Testar se o nginx responde
+curl http://127.0.0.1:8080/
+# Expects: HTML do nginx
+```
+
+### Reinstalacao completa
+
+```bash
+# Parar e limpar tudo
+sudo systemctl stop service-monitoring || true
+sudo systemctl disable service-monitoring || true
+docker compose down
+sudo rm -rf /opt/service-monitoring
+
+# Reinstalar
+./scripts/install.sh
+```
+
+---
+
+## 6. Troubleshooting
+
+| Problema | Solucao |
+|---|---|
+| `ModuleNotFoundError: No module named 'yaml'` | `pip install PyYAML` na virtualenv ativa |
+| `docker: permission denied` | `sudo usermod -aG docker $USER` + logout/login |
+| Containers nao sobem (porta em uso) | `python scripts/ports_check.py -f docker-compose.yaml -v` |
+| `python -m app.main` nao encontra `services.json` | Verificar que esta no diretorio raiz do projeto |
+| Service systemd falha ao iniciar | `sudo journalctl -u service-monitoring -n 50` |
+| Health check retorna FAILED para todos | Verificar se containers estao rodando: `docker ps` |
+| Circuit breaker abre e nao recupera | `docker start <container-name>` manualmente |

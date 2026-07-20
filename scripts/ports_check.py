@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import random
@@ -8,11 +9,13 @@ import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_COMPOSE_FILE = PROJECT_ROOT / "podman" / "podman-compose.yaml"
+DEFAULT_SERVICES_JSON = PROJECT_ROOT / "app" / "config" / "services.json"
 
 
 def fix_nvidia_cdi():
@@ -103,6 +106,95 @@ def process_port_mapping(original_mapping):
     return f"{new_port}:{container_port}{protocol}"
 
 
+def _extract_host_port(port_mapping: str) -> int | None:
+    """Extract the host port from a mapping like '8080:80' or '8080:80/tcp'."""
+    mapping = port_mapping.split("/")[0]
+    parts = mapping.split(":")
+
+    if len(parts) != 2:
+        return None
+
+    host_port = parts[0]
+
+    if "-" in host_port:
+        return None
+
+    try:
+        return int(host_port)
+    except ValueError:
+        return None
+
+
+def update_services_json(
+    changes_report: list[dict],
+    services_json_path: Path,
+):
+    """Update services.json to reflect port changes made in docker-compose.yaml.
+
+    For TCP checks: updates the 'port' field.
+    For HTTP checks: replaces the port in the 'url' field.
+    """
+    if not changes_report:
+        return
+
+    if not services_json_path.exists():
+        logging.warning("services.json not found: %s — skipping sync.", services_json_path)
+        return
+
+    with open(services_json_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    services = config.get("services", [])
+    updated = False
+
+    for change in changes_report:
+        service_name = change["service"]
+        new_host_port = _extract_host_port(change["new"])
+
+        if new_host_port is None:
+            logging.warning(
+                "  Cannot parse new port mapping for %s: %s",
+                service_name, change["new"],
+            )
+            continue
+
+        for svc in services:
+            if svc.get("name") != service_name:
+                continue
+
+            check_type = svc.get("check", "container_state")
+
+            if check_type == "tcp":
+                old_port = svc.get("port")
+                svc["port"] = new_host_port
+                logging.info(
+                    "  services.json [%s] port: %s -> %s",
+                    service_name, old_port, new_host_port,
+                )
+                updated = True
+
+            elif check_type == "http":
+                old_url = svc.get("url", "")
+                parsed = urlparse(old_url)
+                new_netloc = f"{parsed.hostname}:{new_host_port}"
+                new_url = urlunparse(parsed._replace(netloc=new_netloc))
+                svc["url"] = new_url
+                logging.info(
+                    "  services.json [%s] url: %s -> %s",
+                    service_name, old_url, new_url,
+                )
+                updated = True
+
+            break
+
+    if updated:
+        with open(services_json_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4)
+        logging.info("services.json updated successfully.")
+    else:
+        logging.info("No matching services found in services.json to update.")
+
+
 def find_compose():
     if shutil.which("docker"):
         try:
@@ -125,7 +217,11 @@ def find_compose():
     raise RuntimeError("Docker Compose or Podman Compose not found.")
 
 
-def deploy(compose_file: Path, fix_cdi: bool = False):
+def deploy(
+    compose_file: Path,
+    services_json: Path,
+    fix_cdi: bool = False,
+):
     if fix_cdi:
         fix_nvidia_cdi()
 
@@ -170,6 +266,8 @@ def deploy(compose_file: Path, fix_cdi: bool = False):
                 change["new"],
             )
 
+        update_services_json(changes_report, services_json)
+
     compose = find_compose()
 
     cmd = compose + [
@@ -204,6 +302,12 @@ def main():
         help="Path to compose file (default: podman/podman-compose.yaml)",
     )
     parser.add_argument(
+        "-s", "--services-json",
+        type=Path,
+        default=DEFAULT_SERVICES_JSON,
+        help="Path to services.json (default: app/config/services.json)",
+    )
+    parser.add_argument(
         "--fix-cdi",
         action="store_true",
         help="Fix NVIDIA CDI configuration before deploying",
@@ -226,7 +330,11 @@ def main():
         logging.error("Compose file not found: %s", args.file)
         return 1
 
-    return deploy(compose_file=args.file, fix_cdi=args.fix_cdi)
+    return deploy(
+        compose_file=args.file,
+        services_json=args.services_json,
+        fix_cdi=args.fix_cdi,
+    )
 
 
 if __name__ == "__main__":
