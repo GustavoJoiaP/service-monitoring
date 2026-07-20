@@ -81,7 +81,7 @@ class HeartbeatService(IService):
 
             while True:
 
-                print("Heartbeat ❤️")
+                self._logger.info("Heartbeat ❤️")
 
                 await asyncio.sleep(5)
 
