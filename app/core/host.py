@@ -19,11 +19,15 @@ class Host:
     def __init__(self, logger: PythonLogger):
 
         self._logger = logger
+        self._configuration = Configuration("app/config/services.json")
 
         self._registry = ServiceRegistry()
 
         self._manager = ServiceManager(self._registry, self._logger)
-        self._recovery_manager = RecoveryManager(self._logger)
+        self._recovery_manager = RecoveryManager(
+            self._logger,
+            compose_config=self._configuration.compose_config,
+        )
 
         self._health_monitor = HealthMonitor(
             registry=self._registry,
@@ -34,9 +38,8 @@ class Host:
     async def initialize(self):
 
         self._logger.info("Initializing Host...")
-        configuration = Configuration("app/config/services.json")
 
-        for service in configuration.services:
+        for service in self._configuration.services:
 
             if not service["enabled"]:
                 continue
