@@ -1,130 +1,157 @@
-# Linux Service Host (LSH)
+# Linux Service Host (LSH) — Arquitetura
 
-## Artefato de Arquitetura -- Ciclo de Vida
+## Objetivo
 
-### Objetivo
+Documentar a arquitetura, componentes e fluxo de execução do Service Monitoring Host.
 
-Documentar o fluxo de execução do Linux Service Host antes da
-implementação.
+O LSH é um framework em Python para monitorar a saúde de containers (Docker/Podman), com recuperação automática em caso de falha e deploy via systemd para produção.
+
+---
 
 ## Componentes
 
--   **Host**: Orquestra a plataforma.
--   **Configuration**: Carrega configurações.
--   **Registry**: Registra e mantém os serviços.
--   **IService**: Contrato comum dos serviços.
--   **Health Monitor**: Avalia saúde dos serviços.
--   **Recovery Manager**: Executa recuperação.
+| Componente | Responsabilidade |
+|---|---|
+| **Host** | Orquestra a plataforma: carrega configuração, registra serviços, inicia o loop principal |
+| **Configuration** | Lê e valida o `services.json` |
+| **ServiceFactory** | Cria a implementação correta com base no `type` do serviço |
+| **Registry** | Mantém o catálogo de serviços registrados |
+| **ServiceManager** | Inicia/para/reinicia serviços individualmente ou em massa |
+| **IService** | Contrato (interface) que todo serviço deve implementar |
+| **ContainerService** | Monitora um container via Podman ou Docker |
+| **WorkerProcessService** | Gerencia um processo Linux externo |
+| **HeartbeatService** | Serviço interno de heartbeat (para testes) |
+| **CounterService** | Serviço interno de contagem (para testes) |
+| **FaultyService** | Serviço que simula falhas (para testes de recuperação) |
+| **HealthMonitor** | Loop periódico que verifica a saúde de todos os serviços |
+| **RecoveryManager** | Executa a estratégia de recuperação (circuit breaker) |
+
+---
 
 ## Diagrama de Sequência
 
-``` text
+```text
 main.py
     |
     v
-+---------+
-|  Host   |
-+---------+
++------+
+| Host |
++------+
     |
-    |--> Configuration.load()
-    |<-- Configuração carregada
+    |--> Configuration("services.json")
+    |<-- Lista de serviços carregada
     |
-    |--> Registry.register(HeartbeatService)
-    |--> Registry.register(CounterService)
+    |--> ServiceFactory.create(service)  (para cada serviço)
+    |<-- ContainerService | WorkerProcessService | etc.
     |
-    |--> Registry.start_all()
+    |--> Registry.register(instância)
+    |
+    |--> ServiceManager.start_all()
     |        |
-    |        +--> Heartbeat.start()
-    |        +--> Counter.start()
+    |        +--> ContainerService.start()
+    |        |       └── {runtime} ps -a --format {{.Names}}
+    |        |           ├── encontrou → RUNNING
+    |        |           └── não encontrou → FAILED
+    |        |
+    |        +--> HeartbeatService.start()
+    |        +--> WorkerProcessService.start()
     |
     +----------------------------------------------+
     |           LOOP PRINCIPAL (Daemon)            |
     |                                              |
-    |--> HealthMonitor.check_all()                 |
+    |--> HealthMonitor.check_all()  [a cada 5s]    |
     |        |                                     |
-    |        +--> Heartbeat.health()               |
-    |        +--> Counter.health()                 |
-    |                                              |
+    |        +--> ContainerService.is_alive()      |
+    |        |       ├── container_state           |
+    |        |       │   └── {runtime} inspect     |
+    |        |       ├── tcp                       |
+    |        |       │   └── asyncio.open_connection|
+    |        |       └── http                      |
+    |        |           └── urllib.request (GET)  |
+    |        |                                     |
+    |        +--> WorkerProcessService.is_alive()  |
+    |        |       └── os.kill(pid, 0)           |
+    |        |                                     |
     |   Algum serviço falhou?                      |
-    |            |                                 |
-    |         Não|-------------> Sleep(intervalo)  |
-    |            |                                 |
-    |           Sim                                |
-    |            |                                 |
-    |            v                                 |
+    |        |                                     |
+    |     Não |------> Sleep(5s)                   |
+    |        |                                     |
+    |       Sim                                    |
+    |        |                                     |
+    |        v                                     |
     |--> RecoveryManager.recover(service)          |
     |        |                                     |
-    |        +--> stop()                           |
-    |        +--> start()                          |
-    |        +--> validar health()                 |
+    |        +--> restart() x3 (com cooldown)      |
+    |        |       └── {runtime} restart         |
+    |        |                                     |
+    |        +--> Se esgotou: compose down/up      |
+    |              (derruba e sobe tudo)            |
     |                                              |
     +-----------------------> volta ao LOOP -------+
 ```
 
-## Responsabilidades
-
-### Host
-
--   Inicializar a plataforma.
--   Carregar configuração.
--   Registrar serviços.
--   Iniciar serviços.
--   Executar o loop principal.
-
-### Registry
-
--   Registrar serviços.
--   Localizar serviços.
--   Iniciar/parar todos.
--   Expor coleção de serviços.
-
-### IService
-
-Contrato mínimo: - start() - stop() - restart() - health()
-
-### Health Monitor
-
--   Executar verificações periódicas.
--   Produzir relatório de saúde.
--   Nunca reiniciar serviços.
-
-### Recovery Manager
-
--   Receber serviços com falha.
--   Aplicar estratégia de recuperação.
--   Validar retorno à operação.
+---
 
 ## Fluxo de Estados
 
-``` text
+```text
 REGISTERED
-      |
-      v
+    |
+    v
 STARTING
-      |
-      v
-RUNNING
-      |
-      +------> HEALTHY
-      |
-      +------> FAILED
-                   |
-                   v
-              RECOVERING
-                   |
-           +-------+------+
-           |              |
-           v              v
-       RUNNING        STOPPED
+    |
+    v
+RUNNING ──────> HEALTHY (is_alive retorna true)
+    |
+    └──────> FAILED (is_alive retorna false)
+                 |
+                 v
+            RECOVERING
+                 |
+         +-------+------+
+         |              |
+         v              v
+     RUNNING        STOPPED
 ```
+
+---
+
+## Principais Decisões Técnicas
+
+### Runtime configurável
+
+O `ContainerService` aceita um campo `runtime` no config (`"podman"` ou `"docker"`).
+Todos os comandos de container (`ps`, `inspect`, `restart`) usam o runtime configurado,
+permitindo que o mesmo monitor opere com Podman em produção e Docker em desenvolvimento.
+
+### Recuperação em dois níveis
+
+1. **Nível individual:** `{runtime} restart <container>` com backoff exponencial (2^tentativa segundos)
+2. **Nível compose:** `compose down && compose up -d` quando o restart individual esgota as tentativas
+
+O segundo nível é opcional — depende da chave `compose` no `services.json`.
+
+### Health checks assíncronos
+
+- **container_state:** chamada ao runtime via `asyncio.create_subprocess_exec`
+- **tcp:** `asyncio.open_connection` com timeout
+- **http:** `urllib.request` rodado em `run_in_executor` (não bloqueia o event loop)
+
+### Circuit breaker
+
+Cada serviço tem um contador de falhas. Após `max_retries` (3) falhas consecutivas,
+o circuit breaker abre e escala para compose-level recovery. Um cooldown de 30s
+entre tentativas evita flood de restart em cenários de falha intermitente.
+
+---
 
 ## Roadmap
 
-1.  Fundação ✔
-2.  Contratos ✔
-3.  Registry + Serviços
-4.  Health Monitor
-5.  Recovery Manager
-6.  Integração Systemd
-7.  Integração Podman
-8.  Observabilidade
+- [x] Fundação (Host, Configuration, Registry)
+- [x] Contratos (IService, ServiceStatus)
+- [x] Registry + Serviços (ContainerService, WorkerProcessService)
+- [x] Health Monitor (loop periódico de verificação)
+- [x] Recovery Manager (circuit breaker, compose recovery)
+- [x] Integração Systemd (service production-ready)
+- [x] Integração Podman (runtime configurável)
+- [ ] Observabilidade (métricas, alertas, dashboard)
