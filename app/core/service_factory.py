@@ -1,7 +1,7 @@
 from logging import Logger
 
 from app.services.counter_service import CounterService
-from app.services.docker_service import DockerService
+from app.services.container_service import ContainerService
 from app.services.faulty_service import FaultyService
 from app.services.heartbeat_service import HeartbeatService
 from app.services.worker_process_service import WorkerProcessService
@@ -31,7 +31,7 @@ class ServiceFactory:
             )
 
         if service_type == "docker":
-            return DockerService(
+            return ContainerService(
                 logger=logger,
                 config=service
             )

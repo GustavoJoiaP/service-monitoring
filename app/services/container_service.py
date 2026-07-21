@@ -11,7 +11,7 @@ from app.models.service_status import ServiceStatus
 from app.services.interfaces.iservice import IService
 
 
-class DockerService(IService):
+class ContainerService(IService):
 
     def __init__(self, logger: PythonLogger, config: Dict[str, Any]) -> None:
         self._logger = logger
@@ -19,6 +19,7 @@ class DockerService(IService):
         self._service_name: str = config["name"]
         self._container_name: str = config["container_name"]
         self._check_type: str = config.get("check", "container_state")
+        self._runtime: str = config.get("runtime", "docker")
         self._status = ServiceStatus.STOPPED
         self._task: Optional[Task] = None
 
@@ -68,7 +69,7 @@ class DockerService(IService):
             )
 
             proc = await asyncio.create_subprocess_exec(
-                "docker", "restart", self._container_name,
+                self._runtime, "restart", self._container_name,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -89,7 +90,7 @@ class DockerService(IService):
                 )
             else:
                 self._logger.warning(
-                    f"[{self.name}] docker restart failed (attempt {attempt}): "
+                    f"[{self.name}] {self._runtime} restart failed (attempt {attempt}): "
                     f"{stderr.decode().strip()}"
                 )
 
@@ -115,7 +116,7 @@ class DockerService(IService):
 
     async def _container_exists(self) -> bool:
         proc = await asyncio.create_subprocess_exec(
-            "docker", "ps", "-a", "--format", "{{.Names}}",
+            self._runtime, "ps", "-a", "--format", "{{.Names}}",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -125,7 +126,7 @@ class DockerService(IService):
 
     async def _check_container_state(self) -> bool:
         proc = await asyncio.create_subprocess_exec(
-            "docker", "inspect", "--format", "{{.State.Status}}", self._container_name,
+            self._runtime, "inspect", "--format", "{{.State.Status}}", self._container_name,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

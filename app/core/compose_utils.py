@@ -9,6 +9,18 @@ from typing import List, Optional
 
 
 def find_compose() -> List[str]:
+    if shutil.which("podman"):
+        try:
+            subprocess.run(
+                ["podman", "compose", "version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            return ["podman", "compose"]
+        except Exception:
+            pass
+
     if shutil.which("docker"):
         try:
             subprocess.run(

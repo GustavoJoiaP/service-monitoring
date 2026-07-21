@@ -17,6 +17,44 @@ echo "Project directory:"
 echo "$PROJECT_DIR"
 
 ##################################################
+# Detect container runtime
+##################################################
+
+USE_PODMAN=false
+
+if command -v podman >/dev/null 2>&1; then
+    echo "Podman detected."
+    USE_PODMAN=true
+elif command -v docker >/dev/null 2>&1; then
+    echo "Docker detected."
+else
+    echo "No container runtime found. Installing Podman..."
+
+    sudo apt update
+    sudo apt install -y podman podman-compose
+
+    USE_PODMAN=true
+fi
+
+RUNTIME_BIN="docker"
+RUNTIME_COMPOSE="docker compose"
+RUNTIME_SERVICE="docker.service"
+
+if [ "$USE_PODMAN" = true ]; then
+    RUNTIME_BIN="podman"
+    RUNTIME_SERVICE="podman.socket"
+
+    if podman compose version >/dev/null 2>&1; then
+        RUNTIME_COMPOSE="podman compose"
+    else
+        RUNTIME_COMPOSE="podman-compose"
+    fi
+fi
+
+echo "Using runtime: $RUNTIME_BIN"
+echo "Using compose: $RUNTIME_COMPOSE"
+
+##################################################
 # Install prerequisites
 ##################################################
 
@@ -40,88 +78,70 @@ if ! command -v rsync >/dev/null 2>&1; then
     sudo apt install -y rsync
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-    echo "Installing Docker..."
+##################################################
+# Prepare container runtime
+##################################################
 
-    sudo apt install -y docker.io docker-compose-v2
+echo ""
+echo "Preparing $RUNTIME_BIN..."
+
+if [ "$USE_PODMAN" = true ]; then
+    sudo systemctl enable podman.socket 2>/dev/null || true
+    sudo systemctl start podman.socket 2>/dev/null || true
+else
+    sudo pkill -f dockerd || true
+    sudo rm -f /var/run/docker.pid
+    sudo systemctl reset-failed docker || true
+    sudo systemctl daemon-reload
+    sudo systemctl enable containerd
+    sudo systemctl enable docker
+    sudo systemctl restart containerd
+    sudo systemctl restart docker
 fi
 
 ##################################################
-# Prepare Docker
+# Wait for runtime
 ##################################################
 
 echo ""
-echo "Preparing Docker..."
-
-# Kill manually started daemon (safe if not running)
-sudo pkill -f dockerd || true
-
-# Remove stale PID
-sudo rm -f /var/run/docker.pid
-
-# Reset failed state
-sudo systemctl reset-failed docker || true
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable services
-sudo systemctl enable containerd
-sudo systemctl enable docker
-
-# Restart services
-sudo systemctl restart containerd
-sudo systemctl restart docker
-
-##################################################
-# Wait Docker
-##################################################
-
-echo ""
-echo "Waiting Docker become ready..."
+echo "Waiting $RUNTIME_BIN become ready..."
 
 timeout=30
 
-until sudo docker info >/dev/null 2>&1
+until $RUNTIME_BIN info >/dev/null 2>&1
 do
     sleep 1
     timeout=$((timeout-1))
 
     if [ "$timeout" -le 0 ]; then
         echo ""
-        echo "Docker failed to start."
-
-        echo ""
-        sudo systemctl status docker --no-pager
-
-        echo ""
-        sudo journalctl -u docker -n 100 --no-pager
-
+        echo "$RUNTIME_BIN failed to start."
         exit 1
     fi
 done
 
 ##################################################
-# Validate Docker Compose
-##################################################
-
-if ! sudo docker compose version >/dev/null 2>&1; then
-
-    echo ""
-    echo "Docker Compose is not available."
-
-    exit 1
-
-fi
-
-##################################################
-# Docker permissions
+# Validate Compose
 ##################################################
 
 echo ""
-echo "Adding current user to docker group..."
+echo "Validating compose..."
 
-sudo usermod -aG docker "$USER" || true
+if ! $RUNTIME_COMPOSE version >/dev/null 2>&1; then
+    echo ""
+    echo "$RUNTIME_COMPOSE is not available."
+    exit 1
+fi
+
+##################################################
+# Permissions (Docker only)
+##################################################
+
+if [ "$USE_PODMAN" = false ]; then
+    echo ""
+    echo "Adding current user to docker group..."
+    sudo usermod -aG docker "$USER" || true
+fi
 
 ##################################################
 # Create installation folder
@@ -131,7 +151,6 @@ echo ""
 echo "Creating installation directory..."
 
 sudo rm -rf "$INSTALL_DIR"
-
 sudo mkdir -p "$INSTALL_DIR"
 
 ##################################################
@@ -181,7 +200,7 @@ pip install -r requirements.txt
 # Deploy containers
 ##################################################
 
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-podman-compose.yaml}"
 
 if [ -f "$COMPOSE_FILE" ]; then
 
@@ -200,8 +219,6 @@ else
     echo ""
     echo "WARNING: Compose file '$COMPOSE_FILE' not found."
     echo "Skipping container deployment."
-    echo "Run manually when ready:"
-    echo "  cd $INSTALL_DIR && python scripts/ports_check.py -f <compose-file>"
 
 fi
 
@@ -261,12 +278,12 @@ echo "Python version:"
 python3 --version
 
 echo ""
-echo "Docker version:"
-sudo docker --version
+echo "$RUNTIME_BIN version:"
+$RUNTIME_BIN --version
 
 echo ""
-echo "Docker Compose version:"
-sudo docker compose version
+echo "Compose version:"
+$RUNTIME_COMPOSE version
 
 echo ""
 echo "Service status:"
@@ -287,11 +304,13 @@ echo "Stop service:"
 echo "sudo systemctl stop $PROJECT_NAME"
 
 echo ""
-echo "Docker containers:"
-echo "docker ps"
+echo "Containers:"
+echo "$RUNTIME_BIN ps"
 
-echo ""
-echo "NOTE:"
-echo "If this is the first Docker installation,"
-echo "logout/login (or run 'newgrp docker')"
-echo "to use Docker without sudo."
+if [ "$USE_PODMAN" = false ]; then
+    echo ""
+    echo "NOTE:"
+    echo "If this is the first Docker installation,"
+    echo "logout/login (or run 'newgrp docker')"
+    echo "to use Docker without sudo."
+fi

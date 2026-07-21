@@ -1,7 +1,7 @@
 ﻿[Unit]
 Description=Service Monitoring Host
-After=network-online.target docker.service
-Requires=docker.service
+After=network-online.target docker.service podman.socket
+Wants=docker.service podman.socket
 
 [Service]
 Type=simple
@@ -13,7 +13,7 @@ WorkingDirectory=/opt/service-monitoring
 
 Environment=PYTHONUNBUFFERED=1
 
-ExecStartPre=/bin/sh -c 'until docker info >/dev/null 2>&1; do sleep 1; done'
+ExecStartPre=/bin/sh -c 'until podman info >/dev/null 2>&1 || docker info >/dev/null 2>&1; do sleep 1; done'
 
 ExecStart=/opt/service-monitoring/.venv/bin/python -m app.main
 

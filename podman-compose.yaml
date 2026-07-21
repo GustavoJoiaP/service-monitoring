@@ -1,0 +1,256 @@
+services:
+  redis:
+    image: docker.io/redis/redis-stack-server:latest
+    container_name: redis
+    ports:
+    - 6379:6379
+    environment: []
+    restart: unless-stopped
+  whisper:
+    image: docker.io/fedirz/faster-whisper-server:latest-cuda
+    container_name: whisper
+    devices:
+    - nvidia.com/gpu=all
+    environment:
+    - WHISPER_MODEL=base.en
+    - WHISPER_DEVICE=cuda
+    - HF_HOME=/root/.cache/whisper
+    - WHISPER_MODEL_DIR=/root/.cache/whisper
+    volumes:
+    - ./services/whisper:/root/.cache/whisper:Z,U
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities:
+            - gpu
+    ports:
+    - 10023:8000
+    restart: unless-stopped
+  kokoro-tts:
+    build:
+      context: ./services/kokoro
+      dockerfile: Dockerfile
+    container_name: kokoro-tts
+    devices:
+    - nvidia.com/gpu=all
+    ports:
+    - 8300:8300
+    environment:
+    - GPU_IDLE_TIMEOUT=600
+    - KEEP_MODEL_LOADED=true
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities:
+            - gpu
+    restart: unless-stopped
+  agents:
+    build:
+      context: ./livekit/agent
+    container_name: livekit-agents
+    environment:
+    - STT_BASE_URL=http://whisper:8000/v1
+    - STT_MODEL=distil-whisper/distil-large-v3.5-ct2
+    - LLM_URL=http://llm:8023/api/v1/chat
+    - TTS_BASE_URL=http://kokoro-tts:8300/api/tts/stream
+    - LIVEKIT_URL=wss://poke-vgr2ybx0.livekit.cloud
+    - HF_HOME=/root/.cache/huggingface
+    - XDG_CACHE_HOME=/root/.cache
+    - TORCH_HOME=/root/torch
+    env_file:
+    - keys.env
+    depends_on:
+    - whisper
+    volumes:
+    - livekit_shared:/etc/livekit/shared:z
+    - ./livekit/models:/root/.cache/huggingface:Z
+    command:
+    - tail
+    - -f
+    - /dev/null
+    entrypoint: /entrypoint.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities:
+            - gpu
+            - utility
+            - compute
+    restart: unless-stopped
+  local-api:
+    build:
+      context: ./local-api
+      dockerfile: Dockerfile
+    container_name: local-api
+    env_file:
+    - ./local-api/.env
+    ports:
+    - 55185:3000
+    environment:
+    - NODE_ENV=production
+    - LIVEKIT_URL=wss://poke-vgr2ybx0.livekit.cloud
+    volumes:
+    - livekit_shared:/etc/livekit/shared:ro,z
+    restart: unless-stopped
+  front:
+    build:
+      context: ./front
+      dockerfile: dockerfile
+    container_name: front
+    env_file:
+    - ./front/.env
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: '1'
+      PORT: '3001'
+      HOSTNAME: 0.0.0.0
+    expose:
+    - '3001'
+    restart: unless-stopped
+  apache:
+    build:
+      context: ./front
+      dockerfile: apache/dockerfile
+    container_name: apache
+    depends_on:
+    - front
+    ports:
+    - 80:80
+    - 443:443
+    env_file:
+    - ./front/.env
+    volumes:
+    - ./front/apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro,Z
+    environment: []
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    entrypoint:
+    - /bin/sh
+    - /llm/backend/scripts/entrypoint.sh
+    volumes:
+    - ./llm/backend/inference_models/llm:/root/.ollama
+    - ./llm/backend/scripts/entrypoint.sh:/llm/backend/scripts/entrypoint.sh:ro,Z
+    ports:
+    - 11435:11434
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities:
+            - gpu
+    restart: unless-stopped
+    environment: []
+  llm:
+    build:
+      context: ./llm/backend
+    container_name: rag_api
+    command:
+    - bash
+    - -c
+    - bash /app/scripts/seed_rapidocr_models.sh && uvicorn app.main:app --host 0.0.0.0 --port 8023
+    environment:
+      PHOENIX_ENABLED: 'true'
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      PHOENIX_PROJECT_NAME: poke-rag
+      PHOENIX_PROTOCOL: http/protobuf
+      HF_HOME: /hf_cache
+    env_file:
+    - ./llm/.env
+    ports:
+    - 8023:8023
+    volumes:
+    - app_data:/data
+    - rapidocr_models:/opt/inference_models/rapidocr-models
+    - hf_cache_data:/hf_cache:U
+    depends_on:
+    - phoenix
+    - ollama
+    - qdrant
+    - postgres
+    - redis
+    restart: unless-stopped
+  worker:
+    build:
+      context: ./llm/backend
+    container_name: rag_worker
+    command:
+    - bash
+    - -c
+    - bash /app/scripts/seed_rapidocr_models.sh && celery -A app.core.celery_app worker --loglevel=INFO -P solo
+    environment:
+      PHOENIX_ENABLED: 'true'
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006
+      PHOENIX_PROJECT_NAME: poke-rag
+      PHOENIX_PROTOCOL: http/protobuf
+      HF_HOME: /hf_cache
+    env_file:
+    - ./llm/.env
+    volumes:
+    - app_data:/data
+    - rapidocr_models:/opt/inference_models/rapidocr-models
+    - hf_cache_data:/hf_cache:U
+    depends_on:
+    - llm
+    - redis
+    - qdrant
+    - postgres
+    - ollama
+    restart: unless-stopped
+  phoenix:
+    image: docker.io/arizephoenix/phoenix:latest
+    container_name: rag_phoenix
+    ports:
+    - 6006:6006
+    - 4317:4317
+    environment:
+      PHOENIX_WORKING_DIR: /llm/data
+      PHOENIX_HOST: 0.0.0.0
+      PHOENIX_PORT: 6006
+    volumes:
+    - phoenix_data:/llm/data
+    restart: unless-stopped
+  qdrant:
+    image: docker.io/qdrant/qdrant:latest
+    container_name: rag_qdrant
+    ports:
+    - 6333:6333
+    - 6334:6334
+    volumes:
+    - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    environment: []
+  postgres:
+    image: docker.io/library/postgres:16
+    container_name: rag_postgres
+    environment:
+      POSTGRES_DB: rag
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag_password
+    ports:
+    - 5432:5432
+    volumes:
+    - postgres_data:/var/lib/postgresql/data:rw,Z
+    restart: unless-stopped
+volumes:
+  livekit_shared: null
+  ollama_data: null
+  phoenix_data: null
+  qdrant_data: null
+  postgres_data: null
+  rapidocr_models: null
+  caddy_data: null
+  caddy_config: null
+  app_data: null
+  hf_cache_data: null

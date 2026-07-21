@@ -1,72 +1,127 @@
 {
     "compose": {
-        "file": "docker-compose.yaml"
+        "file": "podman-compose.yaml"
     },
     "services": [
-
-        {
-            "type": "worker",
-            "name": "PortsCheck",
-            "enabled": false,
-            "command": [
-                "python3",
-                "scripts/ports_check.py"
-            ]
-        },
         {
             "name": "redis",
             "type": "docker",
             "enabled": true,
-            "container_name": "monitor-redis",
+            "runtime": "podman",
+            "container_name": "redis",
             "check": "tcp",
             "host": "127.0.0.1",
             "port": 6379
         },
         {
-            "name": "postgres",
+            "name": "whisper",
             "type": "docker",
             "enabled": true,
-            "container_name": "monitor-postgres",
+            "runtime": "podman",
+            "container_name": "whisper",
+            "check": "http",
+            "url": "http://127.0.0.1:10023/v1/models",
+            "expected_status": 200,
+            "timeout": 10
+        },
+        {
+            "name": "kokoro-tts",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "kokoro-tts",
+            "check": "http",
+            "url": "http://127.0.0.1:8300/health",
+            "expected_status": 200,
+            "timeout": 10
+        },
+        {
+            "name": "livekit-agents",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "livekit-agents",
+            "check": "container_state"
+        },
+        {
+            "name": "front",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "front",
+            "check": "container_state"
+        },
+        {
+            "name": "apache",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "apache",
+            "check": "http",
+            "url": "http://127.0.0.1:80/",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "local-api",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "local-api",
+            "check": "http",
+            "url": "http://127.0.0.1:55185/health",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "rag_api",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "rag_api",
+            "check": "http",
+            "url": "http://127.0.0.1:8023/health",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "rag_worker",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "rag_worker",
+            "check": "container_state"
+        },
+        {
+            "name": "rag_qdrant",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "rag_qdrant",
+            "check": "tcp",
+            "host": "127.0.0.1",
+            "port": 6333
+        },
+        {
+            "name": "rag_phoenix",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "rag_phoenix",
+            "check": "http",
+            "url": "http://127.0.0.1:6006/",
+            "expected_status": 200,
+            "timeout": 5
+        },
+        {
+            "name": "rag_postgres",
+            "type": "docker",
+            "enabled": true,
+            "runtime": "podman",
+            "container_name": "rag_postgres",
             "check": "tcp",
             "host": "127.0.0.1",
             "port": 5432
-        },
-        {
-            "name": "nginx",
-            "type": "docker",
-            "enabled": true,
-            "container_name": "monitor-nginx",
-            "check": "http",
-            "url": "http://127.0.0.1:8080/",
-            "expected_status": 200,
-            "timeout": 5
-        },
-        {
-            "name": "whoami",
-            "type": "docker",
-            "enabled": true,
-            "container_name": "monitor-whoami",
-            "check": "http",
-            "url": "http://127.0.0.1:8081/",
-            "expected_status": 200,
-            "timeout": 5
-        },
-        {
-            "name": "mock-api",
-            "type": "docker",
-            "enabled": true,
-            "container_name": "monitor-mock-api",
-            "check": "http",
-            "url": "http://127.0.0.1:3000/health",
-            "expected_status": 200,
-            "timeout": 5
-        },
-        {
-            "name": "idle-worker",
-            "type": "docker",
-            "enabled": true,
-            "container_name": "monitor-idle-worker",
-            "check": "container_state"
         }
     ]
 }

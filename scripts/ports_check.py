@@ -14,7 +14,7 @@ from urllib.parse import urlparse, urlunparse
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_COMPOSE_FILE = PROJECT_ROOT / "podman" / "podman-compose.yaml"
+DEFAULT_COMPOSE_FILE = PROJECT_ROOT / "podman-compose.yaml"
 DEFAULT_SERVICES_JSON = PROJECT_ROOT / "app" / "config" / "services.json"
 
 
@@ -196,6 +196,18 @@ def update_services_json(
 
 
 def find_compose():
+    if shutil.which("podman"):
+        try:
+            subprocess.run(
+                ["podman", "compose", "version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            return ["podman", "compose"]
+        except Exception:
+            pass
+
     if shutil.which("docker"):
         try:
             subprocess.run(
@@ -299,7 +311,7 @@ def main():
         "-f", "--file",
         type=Path,
         default=DEFAULT_COMPOSE_FILE,
-        help="Path to compose file (default: podman/podman-compose.yaml)",
+        help="Path to compose file (default: podman-compose.yaml)",
     )
     parser.add_argument(
         "-s", "--services-json",
