@@ -11,6 +11,14 @@ from app.models.service_status import ServiceStatus
 from app.services.interfaces.iservice import IService
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_no_redirect_opener = urllib.request.build_opener(_NoRedirectHandler())
+
+
 class ContainerService(IService):
 
     def __init__(self, logger: PythonLogger, config: Dict[str, Any]) -> None:
@@ -164,23 +172,36 @@ class ContainerService(IService):
         url = self._config["url"]
         expected_status = self._config.get("expected_status", 200)
         timeout = self._config.get("timeout", 10)
+        retries = self._config.get("retries", 2)
 
         loop = asyncio.get_running_loop()
 
         def _request() -> Optional[int]:
             try:
                 req = urllib.request.Request(url, method="GET")
-                with urllib.request.urlopen(req, timeout=timeout) as response:
+                with _no_redirect_opener.open(req, timeout=timeout) as response:
                     return response.status
             except (URLError, OSError, ValueError):
                 return None
 
-        status = await loop.run_in_executor(None, _request)
+        for attempt in range(1 + retries):
+            status = await loop.run_in_executor(None, _request)
 
-        if status == expected_status:
-            return True
+            if status == expected_status:
+                return True
 
-        self._logger.warning(
-            f"[{self.name}] HTTP check for {url} returned {status} (expected {expected_status})"
-        )
+            if status is None:
+                self._logger.warning(
+                    f"[{self.name}] HTTP check attempt {attempt + 1}/{1 + retries} "
+                    f"for {url} failed (connection/request error)"
+                )
+            else:
+                self._logger.warning(
+                    f"[{self.name}] HTTP check attempt {attempt + 1}/{1 + retries} "
+                    f"for {url} returned {status} (expected {expected_status})"
+                )
+
+            if attempt < retries:
+                await asyncio.sleep(1 + attempt)
+
         return False
