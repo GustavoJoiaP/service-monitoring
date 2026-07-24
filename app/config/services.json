@@ -58,9 +58,10 @@
             "runtime": "podman",
             "container_name": "apache",
             "check": "http",
-            "url": "http://127.0.0.1:80/",
+            "url": "https://127.0.0.1/",
             "expected_status": 200,
-            "timeout": 5
+            "timeout": 5,
+            "verify_ssl": false
         },
         {
             "name": "local-api",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ssl
 import urllib.request
 from asyncio import Task
 from logging import Logger as PythonLogger
@@ -183,7 +184,8 @@ class ContainerService(IService):
         def _request() -> Optional[int]:
             try:
                 req = urllib.request.Request(url, method="GET")
-                with _no_redirect_opener.open(req, timeout=timeout) as response:
+                ctx = ssl._create_unverified_context() if not self._config.get("verify_ssl", True) else None
+                with _no_redirect_opener.open(req, timeout=timeout, context=ctx) as response:
                     return response.status
             except (URLError, OSError, ValueError):
                 return None
