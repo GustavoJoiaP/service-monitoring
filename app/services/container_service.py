@@ -21,7 +21,10 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
     http_error_308 = http_error_302
 
 
-_no_redirect_opener = urllib.request.build_opener(_NoRedirectHandler())
+_no_redirect_opener = urllib.request.build_opener(
+    _NoRedirectHandler(),
+    urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),
+)
 
 
 class ContainerService(IService):
@@ -184,8 +187,7 @@ class ContainerService(IService):
         def _request() -> Optional[int]:
             try:
                 req = urllib.request.Request(url, method="GET")
-                ctx = ssl._create_unverified_context() if not self._config.get("verify_ssl", True) else None
-                with _no_redirect_opener.open(req, timeout=timeout, context=ctx) as response:
+                with _no_redirect_opener.open(req, timeout=timeout) as response:
                     return response.status
             except (URLError, OSError, ValueError):
                 return None
